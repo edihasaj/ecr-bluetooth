@@ -296,48 +296,76 @@ namespace EcrBluetooth
             return lastBit != "1";
         }
 
-        public Dictionary<int, string> GetPrintReceipt(SaleParameters parameters)
+        public List<ReturnValue> GetPrintReceipt(SaleParameters parameters)
         {
             var operatorNameByteList = GetSetOperatorNameByte(parameters.OperatorName);
             var initializeReceiptByte = GetInitializeReceiptByte();
-            var response = new Dictionary<int, string>();
+            var response = new List<ReturnValue>();
 
             var iterator = 1;
-            response.Add(iterator, operatorNameByteList);
+            response.Add(new ReturnValue
+            {
+                Id = iterator,
+                Value = operatorNameByteList
+            });
             iterator++;
-            response.Add(iterator, initializeReceiptByte);
+            response.Add(new ReturnValue
+            {
+                Id = iterator,
+                Value = initializeReceiptByte
+            });
             iterator++;
 
             var programLineBytes = GetProgramLinesBytes(parameters.ProgramLine);
             foreach (var programLineByte in programLineBytes)
             {
-                response.Add(iterator, programLineByte);
+                response.Add(new ReturnValue
+                {
+                    Id = iterator,
+                    Value = programLineByte
+                });
                 iterator++;
             }
 
             var registerItemsBytes = GetRegisterItemsBytes(parameters.Items);
             foreach (var registerItems in registerItemsBytes)
             {
-                response.Add(iterator, registerItems);
+                response.Add(new ReturnValue
+                {
+                    Id = iterator,
+                    Value = registerItems
+                });
                 iterator++;
             }
 
             var sellItemsBytes = GetSellItemsBytes(parameters.Items);
             foreach (var sellItemsByte in sellItemsBytes)
             {
-                response.Add(iterator, sellItemsByte);
+                response.Add(new ReturnValue
+                {
+                    Id = iterator,
+                    Value = sellItemsByte
+                });
                 iterator++;
             }
 
             var paymentBytes = GetPaymentBytes(parameters.Payments);
             foreach (var paymentByte in paymentBytes)
             {
-                response.Add(iterator, paymentByte);
+                response.Add(new ReturnValue
+                {
+                    Id = iterator,
+                    Value = paymentByte
+                });
                 iterator++;
             }
 
             var getCloseReceipt = GetCloseReceiptByte();
-            response.Add(iterator, getCloseReceipt);
+            response.Add(new ReturnValue
+            {
+                Id = iterator,
+                Value = getCloseReceipt
+            });
 
             return response;
         }
