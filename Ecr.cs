@@ -2,13 +2,14 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 
 namespace EcrBluetooth
 {
     public class Ecr
     {
-        private int _packetSeq = 0x20;
         private const int MaxDataSize = 218;
+        private int _packetSeq = 0x20;
 
         public string Command(int command, string? data)
         {
@@ -21,7 +22,7 @@ namespace EcrBluetooth
 
         private static string GetPacket(int command, string? arguments)
         {
-            var len = (uint)(arguments?.Length ?? 0);
+            var len = (uint) (arguments?.Length ?? 0);
             var data = ToAnsi(arguments);
 
             for (;;)
@@ -30,21 +31,18 @@ namespace EcrBluetooth
                 uint offs = 0;
                 var crc = 0;
 
-                if (len > MaxDataSize)
-                {
-                    throw new ArgumentException("Lenght of the packet exceeds the limits!");
-                }
+                if (len > MaxDataSize) throw new ArgumentException("Lenght of the packet exceeds the limits!");
 
                 // Set control symbol
                 buf[offs++] = 0x01;
-                buf[offs++] = (byte)(0x24 + len);
+                buf[offs++] = (byte) (0x24 + len);
                 const int mPacketSeq = 0x20;
 
                 // Set packet sequence
                 buf[offs++] = mPacketSeq;
 
                 // Set command
-                buf[offs++] = (byte)command;
+                buf[offs++] = (byte) command;
 
                 // Set data
                 if (len > 0)
@@ -56,20 +54,17 @@ namespace EcrBluetooth
                 // Set control symbol
                 buf[offs++] = 0x05;
                 // Calculate checksum
-                for (var i = 1; i < offs; i++)
-                {
-                    crc += buf[i] & 0xff;
-                }
+                for (var i = 1; i < offs; i++) crc += buf[i] & 0xff;
 
                 // Set checksum
-                buf[offs++] = (byte)(((crc >> 12) & 0xf) + 0x30);
-                buf[offs++] = (byte)(((crc >> 8) & 0xf) + 0x30);
-                buf[offs++] = (byte)(((crc >> 4) & 0xf) + 0x30);
-                buf[offs++] = (byte)(((crc >> 0) & 0xf) + 0x30);
+                buf[offs++] = (byte) (((crc >> 12) & 0xf) + 0x30);
+                buf[offs++] = (byte) (((crc >> 8) & 0xf) + 0x30);
+                buf[offs++] = (byte) (((crc >> 4) & 0xf) + 0x30);
+                buf[offs++] = (byte) (((crc >> 0) & 0xf) + 0x30);
                 // Set control symbol
                 buf[offs] = 0x03;
 
-                return System.Text.Encoding.UTF8.GetString(buf, 0, buf.Length);
+                return Encoding.UTF8.GetString(buf, 0, buf.Length);
             }
         }
 
@@ -82,11 +77,11 @@ namespace EcrBluetooth
             for (var s = 0; s < text.Length; s++)
             {
                 var c = text[s];
-                data[s] = (byte)c;
+                data[s] = (byte) c;
                 if (c < 0x80)
                     continue;
 
-                data[s] = (byte)c;
+                data[s] = (byte) c;
             }
 
             return data;
@@ -137,9 +132,7 @@ namespace EcrBluetooth
             item.Price = Math.Round(item.Price, 2, MidpointRounding.AwayFromZero);
             var priceString = item.Price.ToString(CultureInfo.InvariantCulture);
             if (!string.IsNullOrEmpty(priceString) && priceString.Contains(','))
-            {
                 priceString = priceString.Replace(",", ".");
-            }
 
             if (item.Description.Length >= 25)
                 item.Description = item.Description[..24];
@@ -159,9 +152,7 @@ namespace EcrBluetooth
                 item.Price = Math.Round(item.Price, 2, MidpointRounding.AwayFromZero);
                 var priceString = item.Price.ToString(CultureInfo.InvariantCulture);
                 if (!string.IsNullOrEmpty(priceString) && priceString.Contains(','))
-                {
                     priceString = priceString.Replace(",", ".");
-                }
 
                 if (item.Description.Length >= 25)
                     item.Description = item.Description[..24];
@@ -254,7 +245,7 @@ namespace EcrBluetooth
 
         public string GetDecodeResponse(byte[] resultData, List<int> statusResponses)
         {
-            var data = System.Text.Encoding.UTF8.GetString(resultData);
+            var data = Encoding.UTF8.GetString(resultData);
             var fl = statusResponses.Aggregate("", (current, listItems) =>
                 current + string.Format("{0:x2}", listItems));
 
@@ -263,7 +254,7 @@ namespace EcrBluetooth
 
         public string GetDecodeResultData(byte[] resultData)
         {
-            return System.Text.Encoding.UTF8.GetString(resultData);
+            return Encoding.UTF8.GetString(resultData);
         }
 
         public string GetDecodeResultStatus(byte[] status)
@@ -305,19 +296,48 @@ namespace EcrBluetooth
             return lastBit != "1";
         }
 
-        public List<string> GetPrintReceipt(SaleParameters parameters)
+        public Dictionary<int, string> GetPrintReceipt(SaleParameters parameters)
         {
-            var response = new List<string>
+            var operatorNameByteList = GetSetOperatorNameByte(parameters.OperatorName);
+            var initializeReceiptByte = GetInitializeReceiptByte();
+            var response = new Dictionary<int, string>();
+
+            var iterator = 1;
+            response.Add(iterator, operatorNameByteList);
+            iterator++;
+            response.Add(iterator, initializeReceiptByte);
+            iterator++;
+
+            var programLineBytes = GetProgramLinesBytes(parameters.ProgramLine);
+            foreach (var programLineByte in programLineBytes)
             {
-                GetSetOperatorNameByte(parameters.OperatorName),
-                GetInitializeReceiptByte()
-            };
-            
-            response.AddRange(GetProgramLinesBytes(parameters.ProgramLine));
-            response.AddRange(GetRegisterItemsBytes(parameters.Items));
-            response.AddRange(GetSellItemsBytes(parameters.Items));
-            response.AddRange(GetPaymentBytes(parameters.Payments));
-            response.Add(GetCloseReceiptByte());
+                response.Add(iterator, programLineByte);
+                iterator++;
+            }
+
+            var registerItemsBytes = GetRegisterItemsBytes(parameters.Items);
+            foreach (var registerItems in registerItemsBytes)
+            {
+                response.Add(iterator, registerItems);
+                iterator++;
+            }
+
+            var sellItemsBytes = GetSellItemsBytes(parameters.Items);
+            foreach (var sellItemsByte in sellItemsBytes)
+            {
+                response.Add(iterator, sellItemsByte);
+                iterator++;
+            }
+
+            var paymentBytes = GetPaymentBytes(parameters.Payments);
+            foreach (var paymentByte in paymentBytes)
+            {
+                response.Add(iterator, paymentByte);
+                iterator++;
+            }
+
+            var getCloseReceipt = GetCloseReceiptByte();
+            response.Add(iterator, getCloseReceipt);
 
             return response;
         }
